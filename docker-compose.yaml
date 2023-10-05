@@ -1,0 +1,146 @@
+version: '3'
+services:
+  zookeeper:
+    container_name: zookeeper
+    image: quay.io/debezium/zookeeper:2.1
+    environment:
+      ZOOKEEPER_CLIENT_PORT: "2181"
+
+  kafka:
+    container_name: kafka
+    image: quay.io/debezium/kafka:2.1
+    depends_on:
+      - zookeeper
+    ports:
+      - "9092:9092"
+    environment:
+      - ZOOKEEPER_CONNECT=zookeeper:2181
+
+  connect:
+    container_name: connect
+    build:
+      context: docker/connect
+      args:
+        JMX_AGENT_VERSION: 0.15.0
+    depends_on:
+      - kafka
+    ports:
+      - "8083:8083"
+      - "1976:1976"
+    environment:
+      - BOOTSTRAP_SERVERS=kafka:9092
+      - GROUP_ID=1
+      - CONFIG_STORAGE_TOPIC=my_connect_configs
+      - OFFSET_STORAGE_TOPIC=my_connect_offsets
+      - STATUS_STORAGE_TOPIC=my_connect_statuses
+      - KAFKA_OPTS=-javaagent:/kafka/etc/jmx_prometheus_javaagent.jar=8097:/kafka/etc/config.yml
+      - JMXHOST=localhost
+      - JMXPORT=1976
+      - JAEGER_SERVICE_NAME=connect
+      - JAEGER_AGENT_HOST=jaeger
+      - JAEGER_SAMPLER_TYPE=const
+      - JAEGER_SAMPLER_PARAM=1
+      - CONNECT_PRODUCER_INTERCEPTOR_CLASSES="io.confluent.monitoring.clients.interceptor.MonitoringProducerInterceptor"
+      - CONNECT_CONSUMER_INTERCEPTOR_CLASSES="io.confluent.monitoring.clients.interceptor.MonitoringConsumerInterceptor"
+      - CONNECT_REST_ADVERTISED_HOST_NAME="connect"
+      - CONNECT_ZOOKEEPER_CONNECT=zookeeper:2181
+      - CONNECT_PLUGIN_PATH=/connect-plugins
+      - CONNECT_LOG4J_ROOT_LOGLEVEL=INFO
+      - CONNECT_LOG4J_LOGGERS=org.reflections=ERROR
+#      - CLASSPATH= /usr/share/java/monitoring-interceptors/monitoring-interceptors-3.3.0.jar
+  postgres:
+    container_name: postgres
+    image: debezium/postgres:13
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_USER: postgres_user
+      POSTGRES_PASSWORD: postgres_password
+      POSTGRES_DB: paymentorders
+
+  publisher:
+    container_name: publisher
+    build:
+      context: publisher
+    depends_on:
+      - postgres
+    ports:
+      - "8080:8080"
+    environment:
+      - SPRING_APPLICATION_NAME=publisher
+      - JAEGER_SERVICE_NAME=publisher
+      - JAEGER_AGENT_PORT=6831
+      - JAEGER_SAMPLER_MANAGER_HOST_PORT=jaeger:5778
+
+  consumer:
+    container_name: consumer
+    build:
+      context: consumer
+    depends_on:
+      - kafka
+    ports:
+      - "8081:8081"
+    environment:
+      - SPRING_APPLICATION_NAME=consumer
+      - JAEGER_SERVICE_NAME=consumer
+      - JAEGER_AGENT_HOST=jaeger
+      - JAEGER_AGENT_PORT=6831
+      - JAEGER_SAMPLER_MANAGER_HOST_PORT=jaeger:5778
+
+# --- MONITORING TOOLS --- #
+  kafdrop:
+    container_name: kafdrop
+    image: obsidiandynamics/kafdrop
+    restart: "no"
+    depends_on:
+      - kafka
+    ports:
+      - "9000:9000"
+    environment:
+      KAFKA_BROKERCONNECT: kafka:9092
+      JVM_OPTS: "-Xms16M -Xmx48M -Xss180K -XX:-TieredCompilation -XX:+UseStringDeduplication -noverify"
+
+  debezium-ui:
+    container_name: debezium-ui
+    image: quay.io/debezium/debezium-ui:2.1
+    depends_on:
+      - connect
+    ports:
+      - "8085:8080"
+    environment:
+      - KAFKA_CONNECT_URIS=http://connect:8083
+
+  prometheus:
+    container_name: prometheus
+    build:
+      context: docker/monitoring/prometheus
+      args:
+        PROMETHEUS_VERSION: v2.43.0
+    depends_on:
+      - connect
+    ports:
+      - "9095:9090"
+
+  grafana:
+    container_name: grafana
+    build:
+      context: docker/monitoring/grafana
+      args:
+        GRAFANA_VERSION: 9.4.7
+    depends_on:
+      - prometheus
+    ports:
+      - "3000:3000"
+    environment:
+      - DS_PROMETHEUS=prometheus
+#
+#  jaeger:
+#    container_name: jaeger
+#    image: jaegertracing/all-in-one:1.17
+#    depends_on:
+#      - connect
+#      - consumer
+#      - publisher
+#    ports:
+#      - "16686:16686"
+

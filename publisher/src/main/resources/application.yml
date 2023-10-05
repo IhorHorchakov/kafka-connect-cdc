@@ -1,0 +1,26 @@
+server:
+  port: 8080
+spring:
+  datasource:
+    driverClassName: org.postgresql.Driver
+    password: postgres_password
+    username: postgres_user
+    url: jdbc:postgresql://postgres:5432/paymentorders
+    platform: postgres
+  jpa:
+    database: POSTGRESQL
+    hibernate:
+      ddl-auto: create-drop
+    show-sql: 'true'
+    properties:
+      dialect: org.hibernate.dialect.PostgreSQLDialect
+      hibernate:
+        globally_quoted_identifiers: true
+
+opentracing:
+  enable-b3-propagation: true
+  jaeger:
+    udp-sender:
+      host: jaeger
+      port: 6831
+    log-spans: true

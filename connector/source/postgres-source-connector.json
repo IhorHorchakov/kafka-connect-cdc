@@ -1,0 +1,25 @@
+{
+  "name": "postgres-source-connector",
+  "config": {
+    "connector.class": "io.debezium.connector.postgresql.PostgresConnector",
+    "plugin.name": "pgoutput",
+    "database.server.name": "postgres",
+    "database.hostname": "postgres",
+    "database.port": "5432",
+    "database.user": "postgres_user",
+    "database.password": "postgres_password",
+    "database.dbname": "paymentorders",
+    "topic.prefix": "outbox.event",
+    "table.include.list": "public.outbox",
+    "tombstones.on.delete" : "false",
+    "transforms" : "outbox",
+    "transforms.outbox.type" : "io.debezium.transforms.outbox.EventRouter",
+    "transforms.outbox.table.field.event.id": "id",
+    "transforms.outbox.table.field.event.key": "event_id",
+    "transforms.outbox.table.field.event.payload": "event_payload",
+    "transforms.outbox.table.field.event.payload.id": "event_id",
+    "transforms.outbox.route.by.field": "record_type",
+    "transforms.outbox.topic.replacement": "${routedByValue}",
+    "transforms.outbox.table.field.event.timestamp" : "timestamp"
+  }
+}

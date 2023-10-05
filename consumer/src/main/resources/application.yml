@@ -1,0 +1,27 @@
+server:
+  port: 8081
+spring:
+  kafka:
+    bootstrap-servers: kafka:9092
+    consumer:
+      group-id: resource-group
+      value-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      auto-offset-reset: earliest
+      properties:
+        allow:
+          auto:
+            create:
+              topics: 'true'
+opentracing:
+  enable-b3-propagation: true
+  jaeger:
+    udp-sender:
+      host: jaeger
+      port: 6831
+    log-spans: true
+
+logging:
+  level:
+    io:
+      jaegertracing: DEBUG
